@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "settings": {
+    "workdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "doubleWorkdays": [
+      2
+    ],
+    "threshold": 8,
+    "salaryEnabled": true,
+    "overtimeOnly": true,
+    "payslipEnabled": true,
+    "payslipItems": [
+      {
+        "id": "base",
+        "title": "基础薪资",
+        "amount": 4000,
+        "kind": "income",
+        "note": "月薪"
+      },
+      {
+        "id": "meal",
+        "title": "餐补",
+        "amount": 200,
+        "kind": "income",
+        "note": ""
+      },
+      {
+        "id": "social",
+        "title": "社保",
+        "amount": 350,
+        "kind": "deduction",
+        "note": ""
+      }
+    ],
+    "hourlyRate": 30,
+    "reminderEnabled": false,
+    "reminderTime": "18:00",
+    "reminderDays": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "records": [
+    {
+      "date": "2026-10-12",
+      "total": 10,
+      "hours": [
+        8,
+        2,
+        0,
+        0
+      ],
+      "salaryEnabled": true,
+      "hourlyRate": 30,
+      "note": "界面测试示例"
+    },
+    {
+      "date": "2026-10-13",
+      "total": 10,
+      "hours": [
+        8,
+        0,
+        2,
+        0
+      ],
+      "salaryEnabled": true,
+      "hourlyRate": 30,
+      "note": "界面测试示例"
+    },
+    {
+      "date": "2026-11-01",
+      "total": 8,
+      "hours": [
+        0,
+        0,
+        8,
+        0
+      ],
+      "salaryEnabled": true,
+      "hourlyRate": 20,
+      "note": "界面测试示例"
+    }
+  ],
+  "monthlyLeave": {
+    "2026-10": 1
+  },
+  "monthlyPayslips": {}
+}

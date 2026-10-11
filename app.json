@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "每日工时",
+    "slug": "daily-work-hours",
+    "version": "1.5.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "android": {
+      "versionCode": 7,
+      "package": "com.local.dailyworkhours",
+      "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.INTERNET",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.local.dailyworkhours",
+      "supportsTablet": true
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-document-picker",
+      "expo-sharing"
+    ],
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
