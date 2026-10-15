@@ -11,6 +11,16 @@ type AccessModule={getStatus():Promise<AccessStatus>;openExactAlarmSettings():Pr
 const access=Platform.OS==='android'?requireOptionalNativeModule<AccessModule>('WorkHoursReminderAccess'):null;
 export type ReminderStatus={message:string;summary:string;exactAllowed:boolean|null};
 let lastCapability='';
+export function subscribeReminderResponse(onOpen:(date:string)=>Promise<void>) {
+ const open=(response:Notifications.NotificationResponse)=>{
+  const target=response.notification.request.content.data?.date;
+  return onOpen(typeof target==='string'?target:localDate());
+ };
+ let alive=true;
+ const subscription=Notifications.addNotificationResponseReceivedListener(response=>{void open(response).catch(()=>{});});
+ Notifications.getLastNotificationResponseAsync().then(async response=>{if(response&&alive){await open(response);await Notifications.clearLastNotificationResponseAsync();}}).catch(()=>{});
+ return()=>{alive=false;subscription.remove();};
+}
 if(Platform.OS!=='web')Notifications.setNotificationHandler({handleNotification:async()=>({shouldPlaySound:true,shouldSetBadge:false,shouldShowBanner:true,shouldShowList:true})});
 
 async function prepare(request=false) {

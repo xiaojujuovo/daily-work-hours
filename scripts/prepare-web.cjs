@@ -1,0 +1,10 @@
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.resolve(__dirname,'../dist');
+const file=path.join(root,'index.html');
+let html=fs.readFileSync(file,'utf8');
+const policy="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'";
+html=html.replace(/<html[^>]*>/,'<html lang="zh-CN">').replace(/<title>.*?<\/title>/,'<title>每日工时 · 网页版</title>');
+html=html.replace('</head>',`<meta name="description" content="记录每天工时、月历统计、调休与工资条。数据仅保存在当前浏览器，不上传服务器。"><meta http-equiv="Content-Security-Policy" content="${policy}"><style>html,body,#root{height:100%;margin:0}body{overscroll-behavior-y:none}input,textarea{font:inherit}:focus-visible{outline:2px solid #16765f;outline-offset:3px}</style></head>`);
+fs.writeFileSync(file,html);
+console.log('Static web build ready: dist/ (browser-local data; API connections disabled).');

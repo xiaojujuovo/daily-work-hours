@@ -46,6 +46,6 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'APK build failed.' }
  } finally { Pop-Location }
  New-Item -ItemType Directory -Force -Path release | Out-Null
- Copy-Item -LiteralPath android/app/build/outputs/apk/release/app-release.apk -Destination release/daily-work-hours-1.5.0.apk
- Write-Output 'APK: release/daily-work-hours-1.5.0.apk'
+ Copy-Item -LiteralPath android/app/build/outputs/apk/release/app-release.apk -Destination release/daily-work-hours-1.6.0.apk
+ Write-Output 'APK: release/daily-work-hours-1.6.0.apk'
 } finally { Pop-Location }

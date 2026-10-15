@@ -11,6 +11,7 @@ dist-android/
 *.apk
 *.aab
 *.zip
+*.tar.gz
 *.log
 *.jks
 *.keystore
@@ -23,3 +24,4 @@ local.properties
 coverage/
 **/build/
 **/.gradle/
+/web-site/

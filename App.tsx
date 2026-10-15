@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Linking, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import * as Notifications from 'expo-notifications';
 import { allocate, csv, hourUnits, localDate, money, monthlySummary, saveMonthlyLeave, monthlyPayslip, applyMonthlyWage, payslipCsv, settingsWithPayslipSync, validatePayslipItems, parseBackup, rebalanceHours, units, validDate, validateRecord, validateSettings } from './src/domain';
 import { Data, emptyData, readData, RecordEntry, Settings, Payslip, writeData } from './src/storage';
-import { openReminderSettings, ReminderStatus, syncReminders, testReminder } from './src/reminders';
+import { openReminderSettings, ReminderStatus, syncReminders, testReminder, subscribeReminderResponse } from './src/reminders';
 import { exportFile, importFile } from './src/files';
 import {MonthlyTotals,HoursDetails} from './src/monthly';
 import {PayslipDisplay,PayslipEditor,MonthPayrollSettings,ItemDraft,itemDrafts,readItems} from './src/payslip';
@@ -67,6 +66,7 @@ export default function App() {
  useEffect(()=>{setDetailIndex(null);setPayrollOpen(false);},[month,tab]);
  const [draft,setDraft]=useState<Settings>(data.settings),[threshold,setThreshold]=useState('8'),[rate,setRate]=useState('0');
  const refreshNotifications=(next:Data,request=false)=>{
+   if(Platform.OS==='web')return Promise.resolve();
    reminderQueue.current=reminderQueue.current.catch(()=>{}).then(async()=>{try{const result=await syncReminders(next,request);setReminderStatus(result);setNotice(result.message);}catch(e){const message=`提醒设置失败：${errorText(e)}`;setNotice(message);setReminderStatus({message,summary:message,exactAllowed:null});}});
    return reminderQueue.current;
  };
@@ -82,14 +82,9 @@ export default function App() {
  useEffect(()=>{
    let alive=true;
    readData().then(next=>{if(!alive)return;dataRef.current=next;setData(next);changeSettingsDraft(next.settings);loadEditor(localDate(),next);setLoaded(true);void refreshNotifications(next);}).catch(e=>{if(alive)setLoadError(`本地数据读取失败：${errorText(e)}。为保护原数据，未创建新记录。`);});
-   const appSub=AppState.addEventListener('change',state=>{if(state==='active'&&dataRef.current)void refreshNotifications(dataRef.current);});
-   let sub:Notifications.EventSubscription|undefined;
-   if(Platform.OS!=='web') {
-    const open=(response:Notifications.NotificationResponse)=>{const target=response.notification.request.content.data?.date;loadEditor(typeof target==='string'&&validDate(target)?target:localDate());setTab('record');};
-    sub=Notifications.addNotificationResponseReceivedListener(open);
-    Notifications.getLastNotificationResponseAsync().then(response=>{if(response&&alive){readData().then(next=>{dataRef.current=next;open(response);void Notifications.clearLastNotificationResponseAsync();});}}).catch(()=>{});
-   }
-   return()=>{alive=false;appSub.remove();sub?.remove();};
+   const appSub=Platform.OS==='android'?AppState.addEventListener('change',state=>{if(state==='active'&&dataRef.current)void refreshNotifications(dataRef.current);}):null;
+   const unsubscribe=Platform.OS==='android'?subscribeReminderResponse(async target=>{const next=await readData();if(!alive)return;dataRef.current=next;loadEditor(validDate(target)?target:localDate(),next);setTab('record');}):()=>{};
+   return()=>{alive=false;appSub?.remove();unsubscribe();};
  },[]);
  const automatic=()=>{try{setHours(allocate(total,date,data.settings).map(String));}catch(e){notify(errorText(e));}};
  const changeTotal=(value:string)=>{setTotal(value);try{setHours(allocate(value,date,data.settings).map(String));}catch{/* Allow incomplete decimal input. */}};
@@ -98,7 +93,7 @@ export default function App() {
    const record:RecordEntry={date,total:units(total)/100,hours:hours.map(h=>hourUnits(h)/100),salaryEnabled:editSalary,hourlyRate:editRate,note};validateRecord(record);
    const exists=dataRef.current.records.some(r=>r.date===date);
    if(exists&&!await confirm(`覆盖 ${date} 已有的工时记录？`))return;
-   await commit({...dataRef.current,records:[...dataRef.current.records.filter(r=>r.date!==date),record].sort((a,b)=>b.date.localeCompare(a.date))});notify('已保存到手机本地');
+   await commit({...dataRef.current,records:[...dataRef.current.records.filter(r=>r.date!==date),record].sort((a,b)=>b.date.localeCompare(a.date))});notify(Platform.OS==='web'?'已保存到当前浏览器本地':'已保存到手机本地');
  });
  const monthly=data.records.filter(r=>r.date.startsWith(month)).sort((a,b)=>b.date.localeCompare(a.date));
  const settlement=monthlySummary(data.records,month,data.monthlyLeave[month]??0,true);
@@ -154,7 +149,7 @@ export default function App() {
     <Field label="备注（选填）" value={note} onChange={setNote} placeholder="例如：节假日加班、临时调休" maxLength={500}/>
     {editSalary&&<Text style={styles.hint}>本条记录时薪 ¥{editRate.toFixed(2)} · 预计{salaryLabel} ¥{money({salaryEnabled:editSalary,hourlyRate:editRate,hours:hours.map(h=>Number(h)||0)},true).toFixed(2)}</Text>}
     <Button text={busy?'正在保存…':stored?'保存修改':'保存当天工时'} onPress={save} disabled={busy||!totalValid||!validDate(date)}/>
-   </View><Text style={styles.footerHint}>支持小数小时，最多两位小数。例如 1.5 = 1 小时 30 分钟。</Text><Button text={data.settings.reminderEnabled?`下班提醒 · ${data.settings.reminderTime} · 点击设置`:'开启下班手机提醒'} secondary onPress={()=>{changeSettingsDraft(data.settings);setTab('settings');}}/>
+   </View><Text style={styles.footerHint}>支持小数小时，最多两位小数。例如 1.5 = 1 小时 30 分钟。</Text>{Platform.OS==='android'&&<Button text={data.settings.reminderEnabled?`下班提醒 · ${data.settings.reminderTime} · 点击设置`:'开启下班手机提醒'} secondary onPress={()=>{changeSettingsDraft(data.settings);setTab('settings');}}/>}
   </>}
   {tab==='stats'&&<>
    <View style={[styles.card,styles.calendarCard]}><View style={styles.calendarHeading}><Text style={styles.sectionTitle}>工时月历</Text><Text style={styles.calendarSubtitle}>把每一天，看得清清楚楚</Text></View><View style={styles.monthRow}><Button text="‹ 上月" secondary onPress={()=>{const d=new Date(`${month}-01T12:00:00`);d.setMonth(d.getMonth()-1);setMonth(localDate(d).slice(0,7));}}/><Text style={styles.month}>{month.replace('-',' 年 ')} 月</Text><Button text="下月 ›" secondary onPress={()=>{const d=new Date(`${month}-01T12:00:00`);d.setMonth(d.getMonth()+1);setMonth(localDate(d).slice(0,7));}}/></View>
@@ -173,10 +168,10 @@ export default function App() {
    <View style={styles.card}><Text style={styles.sectionTitle}>工时规则</Text><Text style={styles.label}>每周工作日</Text><DayPicker days={draft.workdays} onChange={workdays=>setDraft({...draft,workdays,doubleWorkdays:draft.doubleWorkdays.filter(d=>workdays.includes(d))})}/><Text style={styles.label}>超出正常门槛按2倍计算的工作日</Text><DayPicker days={draft.doubleWorkdays} allowed={draft.workdays} onChange={doubleWorkdays=>setDraft({...draft,doubleWorkdays})}/><Field label="每天正常工时门槛（小时）" value={threshold} onChange={setThreshold} number/><Text style={styles.hint}>选中的工作日只将超出门槛的部分算2倍，其余工作日超出部分算1.5倍；非工作日仍全部2倍。默认门槛8小时，3倍手动填写。</Text></View>
    <View style={styles.card}><View style={styles.switchRow}><Text style={styles.sectionTitle}>计算加班工资</Text><Switch accessibilityLabel="计算加班工资" value={draft.salaryEnabled} onValueChange={salaryEnabled=>setDraft({...draft,salaryEnabled})} trackColor={{true:'#16765f'}}/></View><Field label="基础时薪（元 / 小时）" number value={rate} onChange={setRate}/><Text style={styles.hint}>只按1.5、2、3倍工时计算加班工资，正常工时不再自动折算工资。基础薪资可加入下面的工资条组成。更改时薪后，可在统计页“更多设置”一次更新本月全部记录。</Text></View>
    <View style={styles.card}><View style={styles.switchRow}><Text style={styles.sectionTitle}>默认工资条组成</Text><Switch accessibilityLabel="默认工资条组成" value={draft.payslipEnabled} onValueChange={payslipEnabled=>setDraft({...draft,payslipEnabled})} trackColor={{true:'#16765f'}}/></View><PayslipEditor items={defaultItems} onChange={setDefaultItems} disabled={busy}/><Text style={styles.hint}>默认组成用于所有月份。修改开关、项目、金额或备注并保存，会同步所有月份并替换各月自定义组成；仅修改时薪或工时规则不会替换。统计页“更多设置”可单独修改本月。</Text></View>
-   <View style={styles.card}><View style={styles.switchRow}><Text style={styles.sectionTitle}>下班提醒</Text><Switch accessibilityLabel="下班提醒" value={draft.reminderEnabled} onValueChange={reminderEnabled=>setDraft({...draft,reminderEnabled})} trackColor={{true:'#16765f'}}/></View>{draft.reminderEnabled&&<><Field label="提醒时间（24小时制）" value={draft.reminderTime} onChange={reminderTime=>setDraft({...draft,reminderTime})} placeholder="18:00"/><Text style={styles.label}>提醒星期</Text><DayPicker days={draft.reminderDays} onChange={reminderDays=>setDraft({...draft,reminderDays})}/><Text style={styles.hint}>已记录的日期不提醒，点击通知可打开对应日期。每次打开应用安排未来60天的通知，请至少每月打开一次。系统省电限制可能影响送达时间。</Text></>}</View>
+   {Platform.OS==='android'&&<View style={styles.card}><View style={styles.switchRow}><Text style={styles.sectionTitle}>下班提醒</Text><Switch accessibilityLabel="下班提醒" value={draft.reminderEnabled} onValueChange={reminderEnabled=>setDraft({...draft,reminderEnabled})} trackColor={{true:'#16765f'}}/></View>{draft.reminderEnabled&&<><Field label="提醒时间（24小时制）" value={draft.reminderTime} onChange={reminderTime=>setDraft({...draft,reminderTime})} placeholder="18:00"/><Text style={styles.label}>提醒星期</Text><DayPicker days={draft.reminderDays} onChange={reminderDays=>setDraft({...draft,reminderDays})}/><Text style={styles.hint}>已记录的日期不提醒，点击通知可打开对应日期。每次打开应用安排未来60天的通知，请至少每月打开一次。系统省电限制可能影响送达时间。</Text></>}</View>}
    <Text style={styles.footerHint}>设置修改后需要保存。工时规则不改历史工时；时薪可在统计页批量更新。默认工资条的修改会同步所有月份。</Text><Button text={busy?'正在保存…':'保存设置'} onPress={saveSettings} disabled={busy}/>
-   <View style={styles.card}><Text style={styles.sectionTitle}>提醒状态与测试</Text><Text style={styles.hint}>{reminderStatus.summary}</Text><Text style={styles.hint}>先保存提醒时间和星期，再查看下次提醒。测试通知不受当天是否已记录影响。</Text><Button text="检查并重新安排提醒" secondary disabled={busy} onPress={()=>action(()=>refreshNotifications(dataRef.current,true))}/><Button text="立即测试通知" secondary disabled={busy} onPress={()=>runReminderTest()}/><Button text="1 分钟后测试提醒" secondary disabled={busy} onPress={()=>runReminderTest(true)}/><Button text="通知权限设置" secondary disabled={busy} onPress={()=>action(()=>openReminderSettings())}/>{Platform.OS==='android'&&<Button text="准时提醒权限设置" secondary disabled={busy} onPress={()=>action(()=>openReminderSettings(true))}/>}{Platform.OS!=='web'&&<Button text="应用与后台运行设置" secondary disabled={busy} onPress={()=>action(()=>Linking.openSettings())}/>}</View>
-   <View style={styles.card}><Text style={styles.sectionTitle}>数据与备份</Text><Text style={styles.hint}>无需账号，共 {data.records.length} 天记录。数据保存在本机，卸载应用会清除记录，请定期将备份保存到手机文件中。</Text><Button text="导出全部工时表格" secondary disabled={busy||!data.records.length} onPress={()=>action(()=>exportFile('全部工时.csv',csv([...data.records].sort((a,b)=>a.date.localeCompare(b.date)),true,data.monthlyLeave),'text/csv'))}/><Button text="保存完整备份" secondary disabled={busy} onPress={()=>action(()=>exportFile(`工时备份-${localDate()}.json`,JSON.stringify(dataRef.current,null,2),'application/json'))}/><Button text="从备份恢复" secondary disabled={busy} onPress={restore}/></View>
+   {Platform.OS==='android'&&<View style={styles.card}><Text style={styles.sectionTitle}>提醒状态与测试</Text><Text style={styles.hint}>{reminderStatus.summary}</Text><Text style={styles.hint}>先保存提醒时间和星期，再查看下次提醒。测试通知不受当天是否已记录影响。</Text><Button text="检查并重新安排提醒" secondary disabled={busy} onPress={()=>action(()=>refreshNotifications(dataRef.current,true))}/><Button text="立即测试通知" secondary disabled={busy} onPress={()=>runReminderTest()}/><Button text="1 分钟后测试提醒" secondary disabled={busy} onPress={()=>runReminderTest(true)}/><Button text="通知权限设置" secondary disabled={busy} onPress={()=>action(()=>openReminderSettings())}/>{Platform.OS==='android'&&<Button text="准时提醒权限设置" secondary disabled={busy} onPress={()=>action(()=>openReminderSettings(true))}/>}<Button text="应用与后台运行设置" secondary disabled={busy} onPress={()=>action(()=>Linking.openSettings())}/></View>}
+   <View style={styles.card}><Text style={styles.sectionTitle}>数据与备份</Text><Text style={styles.hint}>无需账号，共 {data.records.length} 天记录。{Platform.OS==='web'?'数据只保存在当前浏览器，不上传服务器。清除网站数据、使用无痕模式或更换浏览器/网址会影响记录，请定期下载完整备份。安卓和网页可用备份文件手动互通。':'数据保存在本机，卸载应用会清除记录，请定期将备份保存到手机文件中。'}</Text><Button text="导出全部工时表格" secondary disabled={busy||!data.records.length} onPress={()=>action(()=>exportFile('全部工时.csv',csv([...data.records].sort((a,b)=>a.date.localeCompare(b.date)),true,data.monthlyLeave),'text/csv'))}/><Button text="保存完整备份" secondary disabled={busy} onPress={()=>action(()=>exportFile(`工时备份-${localDate()}.json`,JSON.stringify(dataRef.current,null,2),'application/json'))}/><Button text="从备份恢复" secondary disabled={busy} onPress={restore}/></View>
   </>}
    {tab==='settings'&&<About/>}
   </ScrollView><MonthPayrollSettings visible={payrollOpen} month={month} slip={monthlyPayslip(data,month) as Payslip} settings={data.settings} busy={busy} onClose={()=>setPayrollOpen(false)} onSave={saveMonthSlip} onApplyWage={applyMonthWage}/><HoursDetails month={month} index={detailIndex} summary={settlement} onClose={()=>setDetailIndex(null)} onEdit={record=>{setDetailIndex(null);loadEditor(record.date);setTab('record');}}/><View style={styles.nav}>{[['record','记录','＋'],['stats','统计','▤'],['settings','设置','⚙']].map(([key,title,icon])=><Pressable accessibilityRole="tab" accessibilityState={{selected:tab===key}} aria-selected={tab===key} key={key} onPress={()=>{if(key==='settings')changeSettingsDraft(data.settings);setTab(key);}} style={styles.navItem}><Text style={[styles.navIcon,tab===key&&styles.navActive]}>{icon}</Text><Text style={[styles.navText,tab===key&&styles.navActive]}>{title}</Text></Pressable>)}</View>
