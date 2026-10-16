@@ -8,6 +8,7 @@ import { exportFile, importFile } from './src/files';
 import {MonthlyTotals,HoursDetails} from './src/monthly';
 import {PayslipDisplay,PayslipEditor,MonthPayrollSettings,ItemDraft,itemDrafts,readItems} from './src/payslip';
 import {About} from './src/about';
+import {MonthlyComparison} from './src/comparison';
 
 const weekdays = ['日','一','二','三','四','五','六'];
 const labels = ['正常工时','1.5 倍工时','2 倍工时','3 倍工时'];
@@ -62,8 +63,9 @@ export default function App() {
  const [month,setMonth]=useState(localDate().slice(0,7));
  const [detailIndex,setDetailIndex]=useState<number|null>(null);
  const [payrollOpen,setPayrollOpen]=useState(false);
+ const [comparisonOpen,setComparisonOpen]=useState(false);
  const [defaultItems,setDefaultItems]=useState<ItemDraft[]>([]);
- useEffect(()=>{setDetailIndex(null);setPayrollOpen(false);},[month,tab]);
+ useEffect(()=>{setDetailIndex(null);setPayrollOpen(false);setComparisonOpen(false);},[month,tab]);
  const [draft,setDraft]=useState<Settings>(data.settings),[threshold,setThreshold]=useState('8'),[rate,setRate]=useState('0');
  const refreshNotifications=(next:Data,request=false)=>{
    if(Platform.OS==='web')return Promise.resolve();
@@ -152,6 +154,7 @@ export default function App() {
    </View><Text style={styles.footerHint}>支持小数小时，最多两位小数。例如 1.5 = 1 小时 30 分钟。</Text>{Platform.OS==='android'&&<Button text={data.settings.reminderEnabled?`下班提醒 · ${data.settings.reminderTime} · 点击设置`:'开启下班手机提醒'} secondary onPress={()=>{changeSettingsDraft(data.settings);setTab('settings');}}/>}
   </>}
   {tab==='stats'&&<>
+   <Button text="月度对比 · 查看两个月的变化" secondary onPress={()=>setComparisonOpen(true)}/>
    <View style={[styles.card,styles.calendarCard]}><View style={styles.calendarHeading}><Text style={styles.sectionTitle}>工时月历</Text><Text style={styles.calendarSubtitle}>把每一天，看得清清楚楚</Text></View><View style={styles.monthRow}><Button text="‹ 上月" secondary onPress={()=>{const d=new Date(`${month}-01T12:00:00`);d.setMonth(d.getMonth()-1);setMonth(localDate(d).slice(0,7));}}/><Text style={styles.month}>{month.replace('-',' 年 ')} 月</Text><Button text="下月 ›" secondary onPress={()=>{const d=new Date(`${month}-01T12:00:00`);d.setMonth(d.getMonth()+1);setMonth(localDate(d).slice(0,7));}}/></View>
     <MonthCalendar month={month} records={monthly} onOpen={day=>{loadEditor(day);setTab('record');}}/>
    </View>
@@ -174,7 +177,7 @@ export default function App() {
    <View style={styles.card}><Text style={styles.sectionTitle}>数据与备份</Text><Text style={styles.hint}>无需账号，共 {data.records.length} 天记录。{Platform.OS==='web'?'数据只保存在当前浏览器，不上传服务器。清除网站数据、使用无痕模式或更换浏览器/网址会影响记录，请定期下载完整备份。安卓和网页可用备份文件手动互通。':'数据保存在本机，卸载应用会清除记录，请定期将备份保存到手机文件中。'}</Text><Button text="导出全部工时表格" secondary disabled={busy||!data.records.length} onPress={()=>action(()=>exportFile('全部工时.csv',csv([...data.records].sort((a,b)=>a.date.localeCompare(b.date)),true,data.monthlyLeave),'text/csv'))}/><Button text="保存完整备份" secondary disabled={busy} onPress={()=>action(()=>exportFile(`工时备份-${localDate()}.json`,JSON.stringify(dataRef.current,null,2),'application/json'))}/><Button text="从备份恢复" secondary disabled={busy} onPress={restore}/></View>
   </>}
    {tab==='settings'&&<About/>}
-  </ScrollView><MonthPayrollSettings visible={payrollOpen} month={month} slip={monthlyPayslip(data,month) as Payslip} settings={data.settings} busy={busy} onClose={()=>setPayrollOpen(false)} onSave={saveMonthSlip} onApplyWage={applyMonthWage}/><HoursDetails month={month} index={detailIndex} summary={settlement} onClose={()=>setDetailIndex(null)} onEdit={record=>{setDetailIndex(null);loadEditor(record.date);setTab('record');}}/><View style={styles.nav}>{[['record','记录','＋'],['stats','统计','▤'],['settings','设置','⚙']].map(([key,title,icon])=><Pressable accessibilityRole="tab" accessibilityState={{selected:tab===key}} aria-selected={tab===key} key={key} onPress={()=>{if(key==='settings')changeSettingsDraft(data.settings);setTab(key);}} style={styles.navItem}><Text style={[styles.navIcon,tab===key&&styles.navActive]}>{icon}</Text><Text style={[styles.navText,tab===key&&styles.navActive]}>{title}</Text></Pressable>)}</View>
+  </ScrollView><MonthlyComparison visible={comparisonOpen} month={month} data={data} onClose={()=>setComparisonOpen(false)}/><MonthPayrollSettings visible={payrollOpen} month={month} slip={monthlyPayslip(data,month) as Payslip} settings={data.settings} busy={busy} onClose={()=>setPayrollOpen(false)} onSave={saveMonthSlip} onApplyWage={applyMonthWage}/><HoursDetails month={month} index={detailIndex} summary={settlement} onClose={()=>setDetailIndex(null)} onEdit={record=>{setDetailIndex(null);loadEditor(record.date);setTab('record');}}/><View style={styles.nav}>{[['record','记录','＋'],['stats','统计','▤'],['settings','设置','⚙']].map(([key,title,icon])=><Pressable accessibilityRole="tab" accessibilityState={{selected:tab===key}} aria-selected={tab===key} key={key} onPress={()=>{if(key==='settings')changeSettingsDraft(data.settings);setTab(key);}} style={styles.navItem}><Text style={[styles.navIcon,tab===key&&styles.navActive]}>{icon}</Text><Text style={[styles.navText,tab===key&&styles.navActive]}>{title}</Text></Pressable>)}</View>
  </View></SafeAreaView></SafeAreaProvider>;
 }
 const styles=StyleSheet.create({
