@@ -1,0 +1,2 @@
+33f296ffbffc4bfa7548c101017f6620549b1308c1a0cb67ddaee48ec36e1b0c  daily-work-hours-1.7.0.apk
+a62cdfc00192c28ee9e43b80871e2bd86c08930fbedd4646c5403144dc7feded  daily-work-hours-web-1.7.0.zip

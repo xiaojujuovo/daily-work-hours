@@ -1,13 +1,46 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {DEFAULT_SETTINGS as S,allocate,rebalanceHours,hourUnits,validateRecord,validateSettings,money,parseBackup,reminderDates,csv,validDate} from '../src/domain.js';
+import {DEFAULT_SETTINGS as S,allocate,rebalanceHours,hourUnits,normalizeTotalHours,isWidgetConfirmation,widgetEntryMessage,validateRecord,validateSettings,money,parseBackup,reminderDates,csv,validDate} from '../src/domain.js';
 const record={date:'2026-10-06',total:10,hours:[8,2,0,0],salaryEnabled:true,hourlyRate:20,note:''};
+test('桌面确认必须在预览后 3 秒内点击当天的同一个按钮',()=>{
+ const previous={button:'42-clock-out',date:record.date,shownAt:1000};
+ const tap={button:previous.button,date:previous.date,tappedAt:4000};
+ assert.equal(isWidgetConfirmation(previous,tap),true);
+ assert.equal(isWidgetConfirmation(previous,{...tap,tappedAt:4001}),false);
+ assert.equal(isWidgetConfirmation(previous,{...tap,tappedAt:999}),false);
+ assert.equal(isWidgetConfirmation(previous,{...tap,button:'43-clock-out'}),false);
+ assert.equal(isWidgetConfirmation(previous,{...tap,date:'2026-10-07'}),false);
+ assert.equal(isWidgetConfirmation(null,tap),false);
+});
+test('桌面预览显示总工时和有值的倍率，零工时不列分类',()=>{
+ assert.equal(widgetEntryMessage(record),'今天共 10 小时\n正常 8 小时\n1.5 倍 2 小时\n3 秒内再点同一按钮保存');
+ assert.match(widgetEntryMessage({...record,hours:[0,0,8,2]}),/2 倍 8 小时\n3 倍 2 小时/);
+ assert.equal(widgetEntryMessage({...record,total:0,hours:[0,0,0,0]}),'今天共 0 小时\n3 秒内再点同一按钮保存');
+});
+test('新录入的总工时向下取半小时，旧记录仍可读取',()=>{
+ for(const [value,expected] of [['0.49',0],['1.3',1],['1.33',1],['1.49',1],['1.50',1.5],['1.8',1.5],['23.99',23.5],['24',24]]){
+  assert.equal(normalizeTotalHours(value),expected);
+ }
+ for(const value of ['', '-1', '24.01', 'NaN'])assert.throws(()=>normalizeTotalHours(value));
+ const legacy={...record,total:1.33,hours:[1.33,0,0,0]};
+ assert.deepEqual(parseBackup(JSON.stringify({version:1,settings:S,records:[legacy]})).records,[legacy]);
+});
 test('工作日超时倍率、小数及可自定义门槛',()=>{assert.deepEqual(allocate(10.25,'2026-10-06',S),[8,2.25,0,0]);assert.deepEqual(allocate(8,'2026-10-06',{...S,threshold:6}),[6,2,0,0]);});
 test('周六也可以是工作日，周二也可以是休息日',()=>{assert.deepEqual(allocate(10,'2026-10-10',{...S,workdays:[6]}),[8,2,0,0]);assert.deepEqual(allocate(10,'2026-10-06',{...S,workdays:[6]}),[0,0,10,0]);});
 test('手动3倍、工资及合计验证',()=>{const r={...record,hours:[7,1,0,2]};assert.equal(money(validateRecord(r)),290);assert.throws(()=>validateRecord({...r,hours:[8,2,0,2]}));assert.equal(money({...r,salaryEnabled:false}),0);});
 test('小数合计没有浮点误差',()=>{assert.doesNotThrow(()=>validateRecord({...record,total:.3,hours:[.1,.2,0,0]}));});
 test('拒绝无效日期、负数、非数字及超24小时',()=>{assert.equal(validDate('2026-02-30'),false);assert.equal(validDate('2024-02-29'),true);for(const n of [-1,25,'abc','1.234',''])assert.throws(()=>allocate(n,record.date,S));});
 test('设置时间和星期验证',()=>{assert.throws(()=>validateSettings({...S,reminderTime:'25:10'}));assert.throws(()=>validateSettings({...S,workdays:[7]}));assert.throws(()=>validateSettings({...S,reminderEnabled:true,reminderDays:[]}));});
+test('班次设置可备份多个休息时段，包括重叠与班次外时段',()=>{
+ const shift={start:'08:00',end:'18:00',breaks:[
+  {start:'12:00',end:'13:00'},{start:'12:30',end:'14:00'},{start:'18:30',end:'19:00'},
+ ]};
+ const data={version:1,settings:{...S,shift},records:[]};
+ assert.deepEqual(parseBackup(JSON.stringify(data)).settings.shift,shift);
+ assert.throws(()=>validateSettings({...S,shift:{...shift,end:'06:00'}}));
+ assert.throws(()=>validateSettings({...S,shift:{...shift,breaks:[{start:'12:00',end:''}]}}));
+ assert.throws(()=>validateSettings({...S,shift:{...shift,breaks:[{start:'12:00',end:'11:00'}]}}));
+});
 test('备份往返及坏备份不被接受',()=>{const data={version:1,settings:S,records:[record],monthlyLeave:{},monthlyPayslips:{}};assert.deepEqual(parseBackup(JSON.stringify(data)),data);assert.throws(()=>parseBackup(JSON.stringify({...data,records:[record,record]})));assert.throws(()=>parseBackup('{}'));});
 test('备份拒绝字符串时薪和工时，防止恢复后界面异常',()=>{assert.throws(()=>validateRecord({...record,hourlyRate:'20'}));assert.throws(()=>validateRecord({...record,hours:['8',2,0,0]}));assert.throws(()=>validateSettings({...S,hourlyRate:'20'}));});
 test('提醒避开已记录日期、已过时间和未选的星期',()=>{const s={...S,reminderEnabled:true,reminderDays:[2],reminderTime:'18:00'};const dates=reminderDates(s,[record],new Date('2026-10-06T17:00:00'));assert.ok(dates.length>0&&dates.length<60);assert.equal(dates[0].getDate(),13);assert.ok(dates.every(d=>d.getDay()===2&&d.getHours()===18));assert.equal(reminderDates({...s,reminderEnabled:false},[]).length,0);});

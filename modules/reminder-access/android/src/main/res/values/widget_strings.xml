@@ -1,0 +1,5 @@
+<resources>
+ <string name="widget_quick_description">每日工时 · 桌面快记</string>
+ <string name="widget_earned_description">每日工时 · 今日已赚</string>
+ <string name="widget_combined_description">每日工时 · 快记与收入</string>
+</resources>

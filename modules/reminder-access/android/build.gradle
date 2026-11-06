@@ -4,6 +4,9 @@ plugins {
 }
 group = 'com.local.workhours.reminders'
 version = '1.0.0'
+dependencies {
+  implementation 'com.facebook.react:react-android'
+}
 android {
   namespace 'com.local.workhours.reminders'
   defaultConfig {

@@ -1,6 +1,6 @@
 {
   "name": "daily-work-hours",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "license": "MIT",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",

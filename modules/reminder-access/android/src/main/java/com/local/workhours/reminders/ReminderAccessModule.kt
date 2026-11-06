@@ -9,11 +9,28 @@ import android.os.PowerManager
 import android.provider.Settings
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.functions.Queues
 
 class ReminderAccessModule : Module() {
   private fun context(): Context = requireNotNull(appContext.reactContext)
   override fun definition() = ModuleDefinition {
     Name("WorkHoursReminderAccess")
+    AsyncFunction("writeWidgetAwareData") { expected: String?, value: String ->
+      val context = context()
+      val saved = WidgetStore.compareAndSet(context, expected, value)
+      if (saved) runCatching { HomeWidgets.refresh(context) }
+      saved
+    }
+    AsyncFunction("getWidgetSettings") { WidgetConfig.read(context()).json() }
+    AsyncFunction("completeWidgetEntry") { request: String, message: String ->
+      WidgetActionActivity.complete(request, message)
+    }.runOnQueue(Queues.MAIN)
+    AsyncFunction("saveWidgetSettings") { json: String ->
+      val context = context()
+      WidgetConfig.save(context, json)
+      runCatching { HomeWidgets.refresh(context) }
+      Unit
+    }
     AsyncFunction("getStatus") {
       val context = context()
       val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager

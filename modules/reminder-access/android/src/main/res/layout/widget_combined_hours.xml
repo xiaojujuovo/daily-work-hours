@@ -1,0 +1,56 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+ android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
+ android:background="@drawable/widget_panel" android:paddingLeft="12dp" android:paddingRight="12dp"
+ android:paddingTop="7dp" android:paddingBottom="8dp">
+ <LinearLayout android:id="@id/earned_panel" android:layout_width="match_parent" android:layout_height="0dp"
+  android:layout_weight="3" android:orientation="vertical">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+   android:gravity="center_vertical" android:orientation="horizontal">
+   <TextView android:layout_width="20dp" android:layout_height="20dp" android:gravity="center"
+    android:background="@drawable/widget_chip" android:text="¥" android:textColor="#B9F7D6" android:textSize="12sp" android:textStyle="bold"/>
+   <TextView android:id="@id/earned_title" android:layout_width="0dp" android:layout_height="wrap_content"
+    android:layout_weight="1" android:layout_marginStart="6dp" android:textColor="#F5FFF8" android:textSize="13sp"
+    android:textStyle="bold" android:maxLines="1" android:text="今日已赚"/>
+   <TextView android:id="@id/earned_status" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:background="@drawable/widget_chip" android:paddingLeft="6dp" android:paddingRight="6dp"
+    android:textColor="#B9F7D6" android:textSize="10sp" android:maxLines="1" android:text="待开启"/>
+  </LinearLayout>
+  <TextView android:id="@id/earned_value" android:layout_width="match_parent" android:layout_height="0dp"
+   android:layout_weight="1" android:gravity="center_vertical" android:includeFontPadding="false"
+   android:textColor="#CAFFD9" android:textSize="20sp" android:fontFamily="monospace" android:textStyle="bold" android:maxLines="1"
+   android:autoSizeTextType="uniform" android:autoSizeMinTextSize="10sp" android:autoSizeMaxTextSize="27sp" android:text="¥0.00000"/>
+  <LinearLayout android:id="@id/earned_footer" android:layout_width="match_parent" android:layout_height="wrap_content"
+   android:orientation="horizontal" android:gravity="center_vertical">
+   <ProgressBar android:id="@id/earned_progress" style="?android:attr/progressBarStyleHorizontal"
+    android:layout_width="0dp" android:layout_weight="1" android:layout_height="4dp" android:layout_marginEnd="6dp"
+    android:minHeight="4dp" android:maxHeight="4dp" android:progressDrawable="@drawable/widget_progress" android:max="100" android:progress="0"/>
+   <TextView android:id="@id/earned_detail" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:textColor="#C4DBD1" android:textSize="9sp" android:includeFontPadding="false" android:maxLines="1" android:text="班次进度"/>
+  </LinearLayout>
+ </LinearLayout>
+ <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="2"
+  android:layout_marginTop="5dp" android:orientation="vertical">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal"
+   android:gravity="center_vertical">
+   <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+    android:includeFontPadding="false" android:textColor="#F5FFF8" android:textSize="11sp" android:textStyle="bold" android:text="桌面快记"/>
+   <TextView android:id="@id/quick_status" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:includeFontPadding="false" android:textColor="#B9F7D6" android:textSize="10sp" android:maxLines="1" android:text="今天未记"/>
+  </LinearLayout>
+  <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+   android:layout_marginTop="3dp" android:orientation="horizontal">
+   <TextView android:id="@id/preset_0" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+    android:layout_marginEnd="4dp" android:gravity="center" android:background="@drawable/widget_button"
+    android:textColor="#173D31" android:textSize="13sp" android:textStyle="bold" android:includeFontPadding="false" android:maxLines="1" android:text="8 h"/>
+   <TextView android:id="@id/preset_1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+    android:layout_marginEnd="4dp" android:gravity="center" android:background="@drawable/widget_button"
+    android:textColor="#173D31" android:textSize="13sp" android:textStyle="bold" android:includeFontPadding="false" android:maxLines="1" android:text="10 h"/>
+   <TextView android:id="@id/preset_2" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+    android:layout_marginEnd="4dp" android:gravity="center" android:background="@drawable/widget_button" android:textColor="#173D31"
+    android:textSize="13sp" android:textStyle="bold" android:includeFontPadding="false" android:maxLines="1" android:text="12 h"/>
+   <TextView android:id="@id/clock_out" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.4"
+    android:gravity="center" android:background="@drawable/widget_chip" android:textColor="#CAFFD9"
+    android:textSize="11sp" android:textStyle="bold" android:includeFontPadding="false" android:maxLines="1" android:text="一键下班"/>
+  </LinearLayout>
+ </LinearLayout>
+</LinearLayout>

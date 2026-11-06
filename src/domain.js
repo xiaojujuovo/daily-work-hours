@@ -14,6 +14,18 @@ export function units(value, max = 24) {
   if (!Number.isSafeInteger(n) || n > max*100) throw new Error(`数值不能超过 ${max}`);
   return n;
 }
+export function normalizeTotalHours(value) {
+  return Math.floor(units(value) / 50) / 2;
+}
+export function widgetEntryMessage(record) {
+  const labels=['正常','1.5 倍','2 倍','3 倍'];
+  const details=record.hours.flatMap((hours,index)=>hours>0?[`${labels[index]} ${hours} 小时`]:[]);
+  return [`今天共 ${record.total} 小时`,...details,'3 秒内再点同一按钮保存'].join('\n');
+}
+export function isWidgetConfirmation(previous, entry) {
+  return previous?.button===entry.button && previous.date===entry.date
+    && entry.tappedAt>=previous.shownAt && entry.tappedAt-previous.shownAt<=3000;
+}
 export function allocate(total, date, settings) {
   if (!validDate(date)) throw new Error('日期无效，请使用 YYYY-MM-DD 格式');
   const n = units(total);
@@ -77,6 +89,15 @@ export function validateSettings(s) {
   if(s.payslipItems!==undefined)validatePayslipItems(s.payslipItems);
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(s.reminderTime)) throw new Error('提醒时间请填写 HH:mm，例如18:00');
   if (s.reminderEnabled && !s.reminderDays.length) throw new Error('至少选择一个提醒星期');
+  if (s.shift !== undefined) {
+    const validTime = value => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+    const shift = s.shift;
+    if (!shift || !validTime(shift.start) || !validTime(shift.end) || shift.start >= shift.end)
+      throw new Error('请填写同日上下班时间（HH:mm），下班须晚于上班');
+    if (!Array.isArray(shift.breaks) || shift.breaks.some(rest =>
+      !rest || !validTime(rest.start) || !validTime(rest.end) || rest.start >= rest.end))
+      throw new Error('请填写完整的休息时间（HH:mm），结束须晚于开始');
+  }
   return s;
 }
 export function parseBackup(text) {

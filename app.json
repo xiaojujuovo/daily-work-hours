@@ -2,7 +2,7 @@
   "expo": {
     "name": "每日工时",
     "slug": "daily-work-hours",
-    "version": "1.6.1",
+    "version": "1.7.0",
     "platforms": [
       "android",
       "web"
@@ -11,7 +11,7 @@
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
     "android": {
-      "versionCode": 9,
+      "versionCode": 15,
       "package": "com.local.dailyworkhours",
       "allowBackup": false,
       "blockedPermissions": [

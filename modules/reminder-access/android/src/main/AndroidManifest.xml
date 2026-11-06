@@ -1,1 +1,24 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+ <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+ <uses-permission android:name="android.permission.WAKE_LOCK"/>
+ <application>
+  <receiver android:name=".QuickHoursWidget" android:label="@string/widget_quick_description" android:exported="false">
+   <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+   <meta-data android:name="android.appwidget.provider" android:resource="@xml/quick_hours_widget"/>
+  </receiver>
+  <receiver android:name=".EarnedWidget" android:label="@string/widget_earned_description" android:exported="false">
+   <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+   <meta-data android:name="android.appwidget.provider" android:resource="@xml/earned_widget"/>
+  </receiver>
+  <receiver android:name=".CombinedHoursWidget" android:label="@string/widget_combined_description" android:exported="false">
+   <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+   <meta-data android:name="android.appwidget.provider" android:resource="@xml/combined_hours_widget"/>
+  </receiver>
+  <activity android:name=".WidgetActionActivity" android:exported="false" android:excludeFromRecents="true" android:taskAffinity="" android:theme="@android:style/Theme.Material.Light.Dialog.NoActionBar"/>
+  <service android:name=".WidgetEntryService" android:exported="false"/>
+  <service android:name=".LiveEarningsService" android:exported="false" android:foregroundServiceType="specialUse">
+   <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started live on-device earnings counter for an Android home-screen widget"/>
+  </service>
+ </application>
+</manifest>

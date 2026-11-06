@@ -1,0 +1,19 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/earned_panel"
+ android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
+ android:background="@drawable/widget_panel" android:paddingLeft="10dp" android:paddingRight="10dp" android:paddingTop="3dp" android:paddingBottom="3dp">
+ <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+  <TextView android:id="@+id/earned_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+   android:textColor="#F5FFF8" android:textSize="11sp" android:includeFontPadding="false" android:textStyle="bold" android:maxLines="1" android:text="今日已赚"/>
+  <TextView android:id="@+id/earned_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="@drawable/widget_chip"
+   android:paddingLeft="5dp" android:paddingRight="5dp" android:textColor="#B9F7D6" android:textSize="10sp" android:maxLines="1" android:text="待开启"/>
+ </LinearLayout>
+ <TextView android:id="@+id/earned_value" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical"
+  android:textColor="#CAFFD9" android:textSize="21sp" android:includeFontPadding="false" android:fontFamily="monospace" android:textStyle="bold" android:maxLines="1"
+  android:autoSizeTextType="uniform" android:autoSizeMinTextSize="11sp" android:autoSizeMaxTextSize="28sp" android:text="¥0.00000"/>
+ <LinearLayout android:id="@+id/earned_footer" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+  <ProgressBar android:id="@+id/earned_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="4dp"
+   android:minHeight="4dp" android:maxHeight="4dp" android:progressDrawable="@drawable/widget_progress" android:max="100" android:progress="0"/>
+  <TextView android:id="@+id/earned_detail" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+   android:textColor="#C4DBD1" android:textSize="10sp" android:maxLines="1" android:text="班次进度"/>
+ </LinearLayout>
+</LinearLayout>

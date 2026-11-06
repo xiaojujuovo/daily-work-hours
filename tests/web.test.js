@@ -51,6 +51,40 @@ test('网页存储重载后保持工资条和调休，写入失败保留原有�
  assert.deepEqual(await first.readData(),data);
  memory.set('daily-work-hours-v1','invalid');await assert.rejects(first.readData());assert.equal(memory.get('daily-work-hours-v1'),'invalid');
 });
+test('最近工时与正式记录分开保存，连续改动重载后保留最后一次填写',async()=>{
+ const memory=new Map();
+ const dependencies={'@react-native-async-storage/async-storage':{
+  getItem:async key=>memory.get(key)??null,
+  setItem:async(key,value)=>{if(value==='6.5')await new Promise(resolve=>setTimeout(resolve,10));memory.set(key,value);},
+ },'./domain':domain,'react-native':{Platform:{OS:'web'}}};
+ const storage=load('storage.ts',dependencies);
+ assert.equal(await storage.readRecentHours(),null);
+ await Promise.all([storage.writeRecentHours(6.5),storage.writeRecentHours(13.25)]);
+ assert.equal(await load('storage.ts',dependencies).readRecentHours(),13.25);
+ assert.equal((await storage.readData()).records.length,0);
+ await storage.writeRecentHours(0);
+ assert.equal(await storage.readRecentHours(),0);
+ memory.set('daily-work-hours-recent-total','25');
+ assert.equal(await storage.readRecentHours(),null);
+});
+test('桌面更新后拒绝覆盖旧快照，重新读取后可安全保存',async()=>{
+ let stored=null;
+ const storage=load('storage.ts',{'@react-native-async-storage/async-storage':{getItem:async()=>stored},'./domain':domain,'react-native':{Platform:{OS:'android'}}});
+ const write=async(expected,value)=>{
+  if(expected!==stored)return false;
+  stored=value;
+  return true;
+ };
+ const initial=await storage.readData();
+ await storage.writeData({...initial},{before:initial,write});
+ const stale=await storage.readData();
+ const widgetRecord={date:'2026-11-06',total:8,hours:[8,0,0,0],hourlyRate:30,salaryEnabled:true,note:''};
+ stored=JSON.stringify({...stale,records:[widgetRecord]});
+ await assert.rejects(storage.writeData({...stale},{before:stale,write}),storage.WidgetDataConflict);
+ const fresh=await storage.readData();
+ await storage.writeData({...fresh,monthlyLeave:{'2026-11':0}},{before:fresh,write});
+ assert.deepEqual((await storage.readData()).records,[widgetRecord]);
+});
 test('网页不加载通知原生依赖，也不安排提醒或申请权限',async()=>{
  const api=load('reminders.web.ts');
  assert.deepEqual(await api.syncReminders({settings:{reminderEnabled:true}},true),{message:'',summary:'',exactAllowed:null});
