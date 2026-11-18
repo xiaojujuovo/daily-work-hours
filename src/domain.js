@@ -100,6 +100,53 @@ export function validateSettings(s) {
   }
   return s;
 }
+// Abnormal (delay) hours: a separate debugging log that never feeds into work hours or pay.
+export const DELAY_CATEGORIES = [
+  {key:'electrical', label:'电气接线'},
+  {key:'mechanical', label:'机械安装'},
+  {key:'material', label:'缺料/缺件'},
+  {key:'program', label:'技术程序'},
+  {key:'other', label:'其它'},
+];
+const categoryLabels = new Map(DELAY_CATEGORIES.map(c=>[c.key,c.label]));
+export const delayCategoryLabel = key => categoryLabels.get(key) ?? key;
+const DELAY_LIMITS = {order:50, device:50, party:20, parties:5, note:500, entries:20000};
+
+export function normalizeParty(value) {
+  return String(value ?? '').trim().replace(/\s+/g,' ');
+}
+export function validateDelay(entry) {
+  if (!entry || typeof entry!=='object') throw new Error('异常工时记录格式无效');
+  if (typeof entry.id!=='string' || !entry.id || entry.id.length>100) throw new Error('异常工时编号无效');
+  if (typeof entry.date!=='string' || !validDate(entry.date)) throw new Error('异常工时日期无效，请使用 YYYY-MM-DD 格式');
+  for (const [key,label,max] of [['orderNo','订单号',DELAY_LIMITS.order],['device','设备名称',DELAY_LIMITS.device],['note','情况说明',DELAY_LIMITS.note]]) {
+    if (typeof entry[key]!=='string' || entry[key].length>max) throw new Error(`${label}最多 ${max} 字`);
+  }
+  if (typeof entry.hours!=='number') throw new Error('耽误时长必须是数字');
+  if (units(entry.hours)===0) throw new Error('耽误时长需大于 0 小时');
+  if (!categoryLabels.has(entry.category)) throw new Error('请选择原因分类');
+  if (!Array.isArray(entry.parties) || entry.parties.length>DELAY_LIMITS.parties) throw new Error(`责任方最多 ${DELAY_LIMITS.parties} 个`);
+  const seen = new Set();
+  for (const party of entry.parties) {
+    if (typeof party!=='string' || !party || party!==normalizeParty(party) || party.length>DELAY_LIMITS.party) throw new Error(`责任方需为 1 至 ${DELAY_LIMITS.party} 字`);
+    if (seen.has(party)) throw new Error('责任方不能重复');
+    seen.add(party);
+  }
+  return {id:entry.id,date:entry.date,orderNo:entry.orderNo.trim(),device:entry.device.trim(),hours:entry.hours,category:entry.category,parties:[...entry.parties],note:entry.note.trim()};
+}
+export function validateDelays(list) {
+  if (!Array.isArray(list) || list.length>DELAY_LIMITS.entries) throw new Error('异常工时记录格式无效');
+  const ids = new Set(), perDay = new Map();
+  return list.map(item=>{
+    const entry = validateDelay(item);
+    if (ids.has(entry.id)) throw new Error('异常工时编号重复');
+    ids.add(entry.id);
+    const sum = (perDay.get(entry.date) ?? 0) + units(entry.hours);
+    if (sum>2400) throw new Error(`${entry.date} 的异常工时合计不能超过 24 小时`);
+    perDay.set(entry.date,sum);
+    return entry;
+  });
+}
 export function parseBackup(text) {
   const data = JSON.parse(text);
   if (data.version!==1 || !Array.isArray(data.records) || data.records.length>50000) throw new Error('不是支持的工时备份文件');
@@ -107,7 +154,7 @@ export function parseBackup(text) {
   const dates = new Set();
   data.records.forEach(r=>{validateRecord(r); if(dates.has(r.date)) throw new Error('备份内存在重复日期'); dates.add(r.date);});
   const monthlyLeave=validateMonthlyLeave(data.monthlyLeave===undefined?{}:data.monthlyLeave);
-  return {version:1,settings:{...DEFAULT_SETTINGS,...data.settings},records:data.records,monthlyLeave,monthlyPayslips:validateMonthlyPayslips(data.monthlyPayslips===undefined?{}:data.monthlyPayslips)};
+  return {version:1,settings:{...DEFAULT_SETTINGS,...data.settings},records:data.records,monthlyLeave,monthlyPayslips:validateMonthlyPayslips(data.monthlyPayslips===undefined?{}:data.monthlyPayslips),delays:validateDelays(data.delays===undefined?[]:data.delays)};
 }
 export function reminderDates(settings, records, now = new Date()) {
   if (!settings.reminderEnabled) return [];

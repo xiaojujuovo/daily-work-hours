@@ -47,7 +47,7 @@ test('每个分类包含混合工时日，排除0小时及其它月份',()=>{
 test('备份兼容旧版，调休往返以及坏格式拒绝',()=>{
  const data={version:1,settings:DEFAULT_SETTINGS,records:[record('2026-10-01',[8,2,0,0])]};
  assert.deepEqual(parseBackup(JSON.stringify(data)).monthlyLeave,{});
- const current={...data,monthlyLeave:{'2026-10':1.25,'2026-11':4},monthlyPayslips:{}};assert.deepEqual(parseBackup(JSON.stringify(current)),current);
+ const current={...data,monthlyLeave:{'2026-10':1.25,'2026-11':4},monthlyPayslips:{},delays:[]};assert.deepEqual(parseBackup(JSON.stringify(current)),current);
  for(const monthlyLeave of [[],null,{'2026-13':1},{'2026-10':-1},{'2026-10':'2'},{'2026-10':.001},{'2026-10':745}]) {
   assert.throws(()=>parseBackup(JSON.stringify({...data,monthlyLeave})));
  }

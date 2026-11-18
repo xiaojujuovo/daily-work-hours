@@ -54,7 +54,7 @@ test('工资项目小数精确相加，重复编号及坏金额/项目被拒绝'
  for(const items of [[item('a','',1)],[item('a','补贴',-1)],[item('a','补贴','2')],[item('a','补贴',.001)],[item('a','补贴',1,'wrong')],[item('a','补贴',1),item('a','补贴2',2)],Array.from({length:101},(_,i)=>item(String(i),'补贴',1))])assert.throws(()=>validatePayslipItems(items));
 });
 test('旧版备份缺少新字段可读取，新工资条备份完整往返',()=>{
- const current=data();current.monthlyPayslips={'2026-10':{enabled:true,items:[item('custom','补贴',123.45,'income','当月')]}};
+ const current=data();current.delays=[];current.monthlyPayslips={'2026-10':{enabled:true,items:[item('custom','补贴',123.45,'income','当月')]}};
  assert.deepEqual(parseBackup(JSON.stringify(current)),current);
  const old=JSON.parse(JSON.stringify(current));delete old.monthlyPayslips;delete old.settings.doubleWorkdays;delete old.settings.payslipItems;delete old.settings.payslipEnabled;
  const restored=parseBackup(JSON.stringify(old));assert.deepEqual(restored.monthlyPayslips,{});assert.deepEqual(restored.settings.doubleWorkdays,[]);assert.equal(restored.settings.payslipEnabled,false);

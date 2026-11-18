@@ -41,7 +41,7 @@ test('班次设置可备份多个休息时段，包括重叠与班次外时段',
  assert.throws(()=>validateSettings({...S,shift:{...shift,breaks:[{start:'12:00',end:''}]}}));
  assert.throws(()=>validateSettings({...S,shift:{...shift,breaks:[{start:'12:00',end:'11:00'}]}}));
 });
-test('备份往返及坏备份不被接受',()=>{const data={version:1,settings:S,records:[record],monthlyLeave:{},monthlyPayslips:{}};assert.deepEqual(parseBackup(JSON.stringify(data)),data);assert.throws(()=>parseBackup(JSON.stringify({...data,records:[record,record]})));assert.throws(()=>parseBackup('{}'));});
+test('备份往返及坏备份不被接受',()=>{const data={version:1,settings:S,records:[record],monthlyLeave:{},monthlyPayslips:{},delays:[]};assert.deepEqual(parseBackup(JSON.stringify(data)),data);assert.throws(()=>parseBackup(JSON.stringify({...data,records:[record,record]})));assert.throws(()=>parseBackup('{}'));});
 test('备份拒绝字符串时薪和工时，防止恢复后界面异常',()=>{assert.throws(()=>validateRecord({...record,hourlyRate:'20'}));assert.throws(()=>validateRecord({...record,hours:['8',2,0,0]}));assert.throws(()=>validateSettings({...S,hourlyRate:'20'}));});
 test('提醒避开已记录日期、已过时间和未选的星期',()=>{const s={...S,reminderEnabled:true,reminderDays:[2],reminderTime:'18:00'};const dates=reminderDates(s,[record],new Date('2026-10-06T17:00:00'));assert.ok(dates.length>0&&dates.length<60);assert.equal(dates[0].getDate(),13);assert.ok(dates.every(d=>d.getDay()===2&&d.getHours()===18));assert.equal(reminderDates({...s,reminderEnabled:false},[]).length,0);});
 test('CSV编码、换行转义和公式注入处理',()=>{const value=csv([{...record,note:'=SUM(1,2)\n"备注"'}]);assert.ok(value.startsWith('\ufeff'));assert.ok(value.includes("'=SUM"));assert.ok(value.includes('""备注""'));});
