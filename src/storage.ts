@@ -8,13 +8,15 @@ export type ShiftSettings = TimeRange & {breaks:TimeRange[]};
 export const defaultShift:ShiftSettings = {start:'09:00',end:'18:00',breaks:[{start:'12:00',end:'13:00'}]};
 export type Settings = Omit<typeof DEFAULT_SETTINGS,'payslipItems'|'doubleWorkdays'> & {payslipItems:PayslipItem[];doubleWorkdays:number[];shift?:ShiftSettings};
 export type RecordEntry = {date:string;total:number;hours:number[];salaryEnabled:boolean;hourlyRate:number;note:string};
-export type Data = {version:1;settings:Settings;records:RecordEntry[];monthlyLeave:{[month:string]:number};monthlyPayslips:{[month:string]:Payslip}};
+export type DelayCategory=string;
+export type DelayEntry={id:string;date:string;orderNo:string;device:string;hours:number;category:DelayCategory;parties:string[];note:string};
+export type Data = {version:1;settings:Settings;records:RecordEntry[];monthlyLeave:{[month:string]:number};monthlyPayslips:{[month:string]:Payslip};delays:DelayEntry[]};
 export async function persistRecord(data:Data, record:RecordEntry, commit:(next:Data)=>Promise<void>) {
  validateRecord(record);
  const records=[...data.records.filter(r=>r.date!==record.date),record].sort((a,b)=>b.date.localeCompare(a.date));
  await commit({...data,records});
 }
-export const emptyData = ():Data => ({version:1,settings:{...DEFAULT_SETTINGS},records:[],monthlyLeave:{},monthlyPayslips:{}});
+export const emptyData = ():Data => ({version:1,settings:{...DEFAULT_SETTINGS},records:[],monthlyLeave:{},monthlyPayslips:{},delays:[]});
 const KEY='daily-work-hours-v1';
 const RECENT_HOURS_KEY='daily-work-hours-recent-total';
 let recentHoursWrites=Promise.resolve();
