@@ -127,7 +127,7 @@ export function validateDelayCategories(list) {
 export function normalizeParty(value) {
   return String(value ?? '').trim().replace(/\s+/g,' ');
 }
-export function validateDelay(entry) {
+export function validateDelay(entry, migrateLegacy = true) {
   if (!entry || typeof entry!=='object') throw new Error('异常工时记录格式无效');
   if (typeof entry.id!=='string' || !entry.id || entry.id.length>100) throw new Error('异常工时编号无效');
   if (typeof entry.date!=='string' || !validDate(entry.date)) throw new Error('异常工时日期无效，请使用 YYYY-MM-DD 格式');
@@ -136,7 +136,7 @@ export function validateDelay(entry) {
   }
   if (typeof entry.hours!=='number') throw new Error('耽误时长必须是数字');
   if (units(entry.hours)===0) throw new Error('耽误时长需大于 0 小时');
-  const category = Object.hasOwn(LEGACY_DELAY_CATEGORIES,entry.category) ? LEGACY_DELAY_CATEGORIES[entry.category] : entry.category;
+  const category = migrateLegacy && Object.hasOwn(LEGACY_DELAY_CATEGORIES,entry.category) ? LEGACY_DELAY_CATEGORIES[entry.category] : entry.category;
   if (!validCategory(category)) throw new Error('请选择原因分类');
   if (!Array.isArray(entry.parties) || entry.parties.length>DELAY_LIMITS.parties) throw new Error(`责任方最多 ${DELAY_LIMITS.parties} 个`);
   const seen = new Set();
@@ -147,11 +147,11 @@ export function validateDelay(entry) {
   }
   return {id:entry.id,date:entry.date,orderNo:entry.orderNo.trim(),device:entry.device.trim(),hours:entry.hours,category,parties:[...entry.parties],note:entry.note.trim()};
 }
-export function validateDelays(list) {
+export function validateDelays(list, migrateLegacy = true) {
   if (!Array.isArray(list) || list.length>DELAY_LIMITS.entries) throw new Error('异常工时记录格式无效');
   const ids = new Set(), perDay = new Map();
   return list.map(item=>{
-    const entry = validateDelay(item);
+    const entry = validateDelay(item, migrateLegacy);
     if (ids.has(entry.id)) throw new Error('异常工时编号重复');
     ids.add(entry.id);
     const sum = (perDay.get(entry.date) ?? 0) + units(entry.hours);
@@ -167,7 +167,7 @@ export function parseBackup(text) {
   const dates = new Set();
   data.records.forEach(r=>{validateRecord(r); if(dates.has(r.date)) throw new Error('备份内存在重复日期'); dates.add(r.date);});
   const monthlyLeave=validateMonthlyLeave(data.monthlyLeave===undefined?{}:data.monthlyLeave);
-  return {version:1,settings:{...DEFAULT_SETTINGS,...data.settings},records:data.records,monthlyLeave,monthlyPayslips:validateMonthlyPayslips(data.monthlyPayslips===undefined?{}:data.monthlyPayslips),delays:validateDelays(data.delays===undefined?[]:data.delays)};
+  return {version:1,settings:{...DEFAULT_SETTINGS,...data.settings},records:data.records,monthlyLeave,monthlyPayslips:validateMonthlyPayslips(data.monthlyPayslips===undefined?{}:data.monthlyPayslips),delays:validateDelays(data.delays===undefined?[]:data.delays,data.settings.delayCategories===undefined)};
 }
 export function reminderDates(settings, records, now = new Date()) {
   if (!settings.reminderEnabled) return [];

@@ -10,7 +10,7 @@ export function newDelayId(now = Date.now(), random = Math.random) {
 
 const byDate = (a,b)=>a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
 export function saveDelay(list, entry) {
-  const next = validateDelays([...list.filter(d=>d.id!==entry.id), entry]);
+  const next = validateDelays([...list.filter(d=>d.id!==entry.id), entry], false);
   return next.sort((a,b)=>byDate(b,a));
 }
 export function removeDelay(list, id) {
@@ -28,7 +28,7 @@ function suggestions(list, values) {
     s.count++; if (entry.date>s.last) s.last=entry.date;
     stats.set(value,s);
   }
-  return [...stats.values()].sort((a,b)=>b.count-a.count || b.last.localeCompare(a.last) || a.value.localeCompare(b.value)).map(s=>s.value);
+  return [...stats.values()].sort((a,b)=>b.count-a.count || b.last.localeCompare(a.last) || a.value.localeCompare(b.value,'zh-CN')).map(s=>s.value);
 }
 export const knownParties = list => suggestions(list, d=>d.parties);
 export const knownDevices = list => suggestions(list, d=>[d.device]);
@@ -42,7 +42,7 @@ function group(entries, keys) {
     g.hours += units(entry.hours); g.count++;
     map.set(name,g);
   }
-  return [...map.values()].sort((a,b)=>b.hours-a.hours || b.count-a.count || a.name.localeCompare(b.name)).map(g=>({...g,hours:toHours(g.hours)}));
+  return [...map.values()].sort((a,b)=>b.hours-a.hours || b.count-a.count || a.name.localeCompare(b.name,'zh-CN')).map(g=>({...g,hours:toHours(g.hours)}));
 }
 export function monthlyDelays(list, month) {
   if (!/^\d{4}-\d{2}$/.test(month) || !validDate(`${month}-01`)) throw new Error('月份无效');
@@ -99,8 +99,8 @@ export function delayCategoryOptions(categories, current) {
 export function readDelayCategories(drafts) {
   const names = drafts.map(d=>normalizeDelayCategory(d.name));
   const categories = validateDelayCategories(names);
-  const renames = {};
-  drafts.forEach((d,i)=>{ if (d.original && d.original!==names[i]) renames[d.original]=names[i]; });
+  const renames = Object.fromEntries(drafts.flatMap((d,i)=>
+    d.original && d.original!==names[i] ? [[d.original,names[i]]] : []));
   return {categories, renames};
 }
 export function renameDelayCategories(delays, renames) {

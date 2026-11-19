@@ -42,14 +42,14 @@ test('新增、修改、删除不改动原数组，按日期查询当天条目',
 });
 test('责任方、设备、订单建议按使用次数排序并去掉空值',()=>{
  const list=sample();
- assert.deepEqual(knownParties(list),['电工','供应商','采购','机械组']);
+ assert.deepEqual(knownParties(list),['电工','采购','供应商','机械组']);
  assert.deepEqual(knownDevices(list),['3号线码垛机','包装机']);
  assert.deepEqual(knownOrders(list),['SO-118','SO-120']);
 });
 test('月度汇总只算本月，按责任方/原因/设备分组，多责任方各自计入',()=>{
  const s=monthlyDelays(sample(),'2026-11');
  assert.equal(s.count,4);assert.equal(s.days,3);assert.equal(s.hours,10.75);
- assert.deepEqual(s.byParty,[{name:'电工',hours:5.75,count:2},{name:NO_PARTY,hours:3,count:1},{name:'供应商',hours:2,count:1},{name:'采购',hours:2,count:1}]);
+ assert.deepEqual(s.byParty,[{name:'电工',hours:5.75,count:2},{name:NO_PARTY,hours:3,count:1},{name:'采购',hours:2,count:1},{name:'供应商',hours:2,count:1}]);
  assert.deepEqual(s.byCategory.map(g=>[g.name,g.hours]),[['电气接线',5.75],['技术程序',3],['缺料/缺件',2]]);
  assert.deepEqual(s.byDevice.map(g=>g.name),['3号线码垛机','包装机','未填写设备']);
  assert.deepEqual(s.entries.map(d=>d.id),['a','b','c','d']);
@@ -116,4 +116,12 @@ test('设置中改名会同步已有记录，删除分类保留历史记录',()=
  assert.equal(validateDelays(renamed).length,5);
  assert.equal(delayCategoryUsage(renamed,'电气 接线返工'),2);
  assert.ok(validateDelayCategories(['x']));
+});
+test('自定义英文分类和特殊名称可保存、改名并备份往返',()=>{
+ const entries=saveDelay([],delay('custom','2026-11-19',1,'other'));
+ assert.equal(entries[0].category,'other');
+ const backup={version:1,settings:{...DEFAULT_SETTINGS,delayCategories:['other']},records:[],delays:entries};
+ assert.equal(parseBackup(JSON.stringify(backup)).delays[0].category,'other');
+ const {renames}=readDelayCategories([{original:'__proto__',name:'新名称'}]);
+ assert.equal(renameDelayCategories([delay('special','2026-11-19',1,'__proto__')],renames)[0].category,'新名称');
 });
