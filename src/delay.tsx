@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {Modal,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
-import type {DelayCategory,DelayEntry} from './storage';
-import {DELAY_CATEGORIES,NO_PARTY,delayCategoryLabel,delaysOn,knownDevices,knownOrders,knownParties,monthlyDelays,newDelayId,normalizeParty} from './delay-domain.js';
+import type {DelayEntry} from './storage';
+import {DEFAULT_DELAY_CATEGORIES,NO_PARTY,delayCategoryOptions,delayCategoryUsage,delaysOn,knownDevices,knownOrders,knownParties,monthlyDelays,newDelayId,normalizeParty} from './delay-domain.js';
 import {validDate} from './domain';
 
 const hours=(value:number)=>`${Number(value.toFixed(2))}h`;
@@ -33,8 +33,8 @@ function splitParties(text:string) {
 }
 
 export type DelayDraft={entry?:DelayEntry;date:string};
-export function DelayEditor({draft,delays,busy,onClose,onSave,onDelete}:{draft:DelayDraft|null;delays:DelayEntry[];busy:boolean;onClose:()=>void;onSave:(entry:DelayEntry)=>Promise<void>;onDelete:(entry:DelayEntry)=>Promise<boolean>}) {
- const [date,setDate]=useState(''),[orderNo,setOrderNo]=useState(''),[device,setDevice]=useState(''),[value,setValue]=useState(''),[category,setCategory]=useState<DelayCategory|null>(null);
+export function DelayEditor({draft,delays,categories,busy,onClose,onSave,onDelete}:{draft:DelayDraft|null;delays:DelayEntry[];categories:string[];busy:boolean;onClose:()=>void;onSave:(entry:DelayEntry)=>Promise<void>;onDelete:(entry:DelayEntry)=>Promise<boolean>}) {
+ const [date,setDate]=useState(''),[orderNo,setOrderNo]=useState(''),[device,setDevice]=useState(''),[value,setValue]=useState(''),[category,setCategory]=useState<string|null>(null);
  const [parties,setParties]=useState<string[]>([]),[partyInput,setPartyInput]=useState(''),[note,setNote]=useState(''),[feedback,setFeedback]=useState('');
  useEffect(()=>{
   if(!draft)return;
@@ -75,7 +75,7 @@ export function DelayEditor({draft,delays,busy,onClose,onSave,onDelete}:{draft:D
    <Suggestions values={knownDevices(delays)} current={device} onPick={setDevice}/>
    <Input label="耽误时长（小时）" value={value} onChange={setValue} number placeholder="例如：2.5"/>
    <View style={s.chips}>{[0.5,1,2,3,4,8].map(h=><Chip key={h} text={`${h}h`} label={`耽误 ${h} 小时`} active={value===String(h)} onPress={()=>setValue(String(h))}/>)}</View>
-   <View style={s.field}><Text style={s.label}>原因分类</Text><View style={s.chips}>{DELAY_CATEGORIES.map(c=><Chip key={c.key} text={c.label} active={category===c.key} onPress={()=>setCategory(c.key as DelayCategory)}/>)}</View></View>
+   <View style={s.field}><Text style={s.label}>原因分类</Text><View style={s.chips}>{delayCategoryOptions(categories,draft?.entry?.category).map((c:string)=><Chip key={c} text={c} active={category===c} onPress={()=>setCategory(c)}/>)}</View><Text style={s.hint}>分类可在「设置 → 异常工时原因分类」中修改</Text></View>
    <View style={s.field}>
     <Text style={s.label}>责任方（可多个）</Text>
     {parties.length>0&&<View style={s.chips}>{parties.map(p=><Chip key={p} text={`${p}  ×`} label={`移除责任方 ${p}`} active onPress={()=>setParties(parties.filter(x=>x!==p))}/>)}</View>}
@@ -95,9 +95,9 @@ export function DelayEditor({draft,delays,busy,onClose,onSave,onDelete}:{draft:D
 
 function EntryRow({entry,onEdit,showDate=false}:{entry:DelayEntry;onEdit:(entry:DelayEntry)=>void;showDate?:boolean}) {
  const head=[showDate&&entry.date,entry.orderNo&&`订单 ${entry.orderNo}`,entry.device].filter(Boolean).join(' · ');
- return <Pressable accessibilityRole="button" accessibilityLabel={`${head||'异常工时'}，${delayCategoryLabel(entry.category)}，${hours(entry.hours)}，点击修改`} onPress={()=>onEdit(entry)} style={s.entry}>
-  <View style={s.entryHeading}><Text style={s.entryTitle} numberOfLines={1}>{head||delayCategoryLabel(entry.category)}</Text><Text style={s.entryHours}>{hours(entry.hours)}</Text></View>
-  <View style={s.chips}><Text style={s.tag}>{delayCategoryLabel(entry.category)}</Text>{(entry.parties.length?entry.parties:[NO_PARTY]).map(p=><Text key={p} style={[s.tag,s.partyTag]}>{p}</Text>)}</View>
+ return <Pressable accessibilityRole="button" accessibilityLabel={`${head||'异常工时'}，${entry.category}，${hours(entry.hours)}，点击修改`} onPress={()=>onEdit(entry)} style={s.entry}>
+  <View style={s.entryHeading}><Text style={s.entryTitle} numberOfLines={1}>{head||entry.category}</Text><Text style={s.entryHours}>{hours(entry.hours)}</Text></View>
+  <View style={s.chips}><Text style={s.tag}>{entry.category}</Text>{(entry.parties.length?entry.parties:[NO_PARTY]).map(p=><Text key={p} style={[s.tag,s.partyTag]}>{p}</Text>)}</View>
   {!!entry.note&&<Text style={s.hint}>{entry.note}</Text>}
  </Pressable>;
 }
@@ -148,6 +148,46 @@ export function DelayMonthly({month,delays,busy,onAdd,onEdit,onCopy,onExport}:{m
  </View>;
 }
 
+export type CategoryDraft={key:string;original:string|null;name:string};
+let draftKey=0;
+export const categoryDrafts=(categories:string[]):CategoryDraft[]=>categories.map(name=>({key:`c${draftKey++}`,original:name,name}));
+export function DelayCategorySettings({drafts,delays,disabled,onChange}:{drafts:CategoryDraft[];delays:DelayEntry[];disabled:boolean;onChange:(drafts:CategoryDraft[])=>void}) {
+ const [input,setInput]=useState('');
+ const move=(index:number,offset:number)=>{const next=[...drafts];const [item]=next.splice(index,1);next.splice(index+offset,0,item);onChange(next);};
+ const add=()=>{
+  const names=input.split(/[,，、;；\n]/).map(n=>n.trim().replace(/\s+/g,' ')).filter(Boolean);
+  const existing=new Set(drafts.map(d=>d.name.trim()));
+  const fresh=[...new Set(names)].filter(n=>!existing.has(n));
+  if(fresh.length)onChange([...drafts,...fresh.map(name=>({key:`c${draftKey++}`,original:null,name}))]);
+  setInput('');
+ };
+ const defaults=()=>{
+  const kept=drafts.filter(d=>DEFAULT_DELAY_CATEGORIES.includes(d.name.trim()));
+  onChange([...kept,...DEFAULT_DELAY_CATEGORIES.filter((n:string)=>!kept.some(d=>d.name.trim()===n)).map((name:string)=>({key:`c${draftKey++}`,original:null,name}))]);
+ };
+ return <View style={s.card}>
+  <Text style={s.sectionTitle}>异常工时原因分类</Text>
+  <Text style={s.hint}>记录异常工时时可选的原因。改名会同步已有记录；删除分类不影响已有记录，历史统计照常显示。</Text>
+  {drafts.map((d,i)=>{
+   const used=d.original?delayCategoryUsage(delays,d.original):0;
+   return <View key={d.key} style={s.categoryRow}>
+    <View style={s.row}>
+     <TextInput accessibilityLabel={`原因分类 ${i+1}`} value={d.name} editable={!disabled} maxLength={20} onChangeText={name=>onChange(drafts.map(x=>x.key===d.key?{...x,name}:x))} style={[s.input,{flex:1}]}/>
+     <Pressable accessibilityRole="button" accessibilityLabel={`上移 ${d.name}`} disabled={disabled||i===0} onPress={()=>move(i,-1)} style={[s.iconButton,(disabled||i===0)&&{opacity:.3}]}><Text style={s.actionText}>↑</Text></Pressable>
+     <Pressable accessibilityRole="button" accessibilityLabel={`下移 ${d.name}`} disabled={disabled||i===drafts.length-1} onPress={()=>move(i,1)} style={[s.iconButton,(disabled||i===drafts.length-1)&&{opacity:.3}]}><Text style={s.actionText}>↓</Text></Pressable>
+     <Pressable accessibilityRole="button" accessibilityLabel={`删除 ${d.name}`} disabled={disabled||drafts.length<=1} onPress={()=>onChange(drafts.filter(x=>x.key!==d.key))} style={[s.iconButton,s.danger,(disabled||drafts.length<=1)&&{opacity:.3}]}><Text style={[s.actionText,{color:'#a8452c'}]}>✕</Text></Pressable>
+    </View>
+    {(used>0||(d.original&&d.original!==d.name.trim()))&&<Text style={s.hint}>{d.original&&d.original!==d.name.trim()?`由「${d.original}」改名，保存后同步 ${used} 条记录`:`已有 ${used} 条记录使用`}</Text>}
+   </View>;
+  })}
+  <View style={s.row}>
+   <TextInput accessibilityLabel="新增原因分类" value={input} editable={!disabled} onChangeText={setInput} onSubmitEditing={add} blurOnSubmit={false} placeholder="新增分类，如：等待甲方确认" placeholderTextColor="#a4afa9" maxLength={60} style={[s.input,{flex:1}]}/>
+   <Action text="添加" disabled={disabled||!input.trim()} onPress={add} label="添加原因分类"/>
+  </View>
+  <Action text="补回默认分类" disabled={disabled} onPress={defaults}/>
+ </View>;
+}
+
 const s=StyleSheet.create({
  card:{backgroundColor:'#fff',borderRadius:20,padding:20,gap:12,borderWidth:1,borderColor:'#e6ede5'},
  sectionTitle:{fontSize:18,fontWeight:'700',color:'#294a38'},
@@ -178,4 +218,5 @@ const s=StyleSheet.create({
  dialog:{width:'100%',maxWidth:620,maxHeight:'92%',borderRadius:22,backgroundColor:'#fff',padding:16,gap:14},
  heading:{flexDirection:'row',alignItems:'center',gap:8},title:{fontSize:22,fontWeight:'800',color:'#294a38'},
  content:{gap:14,paddingBottom:4,overflow:'hidden'},
+ categoryRow:{gap:4},iconButton:{width:44,height:46,borderRadius:12,backgroundColor:'#edf4ee',alignItems:'center',justifyContent:'center'},
 });

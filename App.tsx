@@ -13,8 +13,8 @@ import {widgets,type LegacyWidgetSchedule,type WidgetConfiguration} from './src/
 import {WidgetSettings} from './src/widget-settings';
 import {MonthlyComparison} from './src/comparison';
 import {registerWidgetEntry} from './src/widget-entry';
-import {DelayDay,DelayEditor,DelayMonthly,type DelayDraft} from './src/delay';
-import {delayCsv,delaySummaryText,monthlyDelays,removeDelay,saveDelay} from './src/delay-domain.js';
+import {DelayCategorySettings,DelayDay,DelayEditor,DelayMonthly,categoryDrafts,type CategoryDraft,type DelayDraft} from './src/delay';
+import {delayCsv,delaySummaryText,monthlyDelays,readDelayCategories,removeDelay,renameDelayCategories,saveDelay} from './src/delay-domain.js';
 
 registerWidgetEntry();
 
@@ -87,6 +87,7 @@ export default function App() {
  const [comparisonOpen,setComparisonOpen]=useState(false);
  const [defaultItems,setDefaultItems]=useState<ItemDraft[]>([]);
  const [delayDraft,setDelayDraft]=useState<DelayDraft|null>(null);
+ const [delayCategoryDrafts,setDelayCategoryDrafts]=useState<CategoryDraft[]>([]);
  useEffect(()=>{setDetailIndex(null);setPayrollOpen(false);setComparisonOpen(false);setDelayDraft(null);},[month,tab]);
  const [draft,setDraft]=useState<Settings>(data.settings),[threshold,setThreshold]=useState('8'),[rate,setRate]=useState('0');
  const [legacyShift,setLegacyShift]=useState(defaultShift);
@@ -105,7 +106,7 @@ export default function App() {
    setDate(day);setTotal(String(initialTotal));setNote(record?.note??'');
    setHours((record?.hours??allocate(initialTotal,day,current.settings)).map(String));setEditSalary(record?.salaryEnabled??current.settings.salaryEnabled);setEditRate(record?.hourlyRate??current.settings.hourlyRate);
  };
- const changeSettingsDraft=(settings:Settings)=>{setDraft({...settings});setThreshold(String(settings.threshold));setRate(String(settings.hourlyRate));setDefaultItems(itemDrafts(settings.payslipItems));};
+ const changeSettingsDraft=(settings:Settings)=>{setDraft({...settings});setThreshold(String(settings.threshold));setRate(String(settings.hourlyRate));setDefaultItems(itemDrafts(settings.payslipItems));setDelayCategoryDrafts(categoryDrafts(settings.delayCategories));};
  const applyDesktopData=(next:Data,recent:number|null)=>{
    const before=dataRef.current;
    if(dataSnapshot(next)===dataSnapshot(before))return;
@@ -240,10 +241,13 @@ export default function App() {
  const totalValid=(()=>{try{return units(total)===hours.reduce((n,v)=>n+hourUnits(v),0);}catch{return false;}})();
  const stored=data.records.find(r=>r.date===date);
  const saveSettings=()=>action(async()=>{
-   const settings={...draft,shift,...reminderPreferences(dataRef.current.settings),threshold:units(threshold)/100,hourlyRate:units(rate,100000)/100,payslipItems:readItems(defaultItems),overtimeOnly:true};validateSettings(settings);
-   await commit(settingsWithPayslipSync(dataRef.current,settings) as Data,settings.reminderEnabled);changeSettingsDraft(settings);
+   const settings={...draft,shift,...reminderPreferences(dataRef.current.settings),threshold:units(threshold)/100,hourlyRate:units(rate,100000)/100,payslipItems:readItems(defaultItems),overtimeOnly:true};
+   const {categories:delayCategories,renames}=readDelayCategories(delayCategoryDrafts);settings.delayCategories=delayCategories;validateSettings(settings);
+   const delays=renameDelayCategories(dataRef.current.delays,renames) as DelayEntry[];
+   const synced=delays.filter((d,i)=>d!==dataRef.current.delays[i]).length;
+   await commit({...settingsWithPayslipSync(dataRef.current,settings) as Data,delays},settings.reminderEnabled);changeSettingsDraft(settings);
    if(!stored){setEditSalary(settings.salaryEnabled);setEditRate(settings.hourlyRate);try{setHours(allocate(total,date,settings).map(String));}catch{/* Incomplete editor values do not prevent saving settings. */}}
-   notify('设置已保存');
+   notify(synced?`设置已保存，已同步 ${synced} 条异常工时的原因分类`:'设置已保存');
  });
  const restore=()=>action(async()=>{
    const raw=await importFile();if(raw===null)return;const backup=parseBackup(raw) as Data;
@@ -310,6 +314,7 @@ export default function App() {
    </View>
    <View style={styles.card}><View style={styles.switchRow}><Text style={styles.sectionTitle}>计算加班工资</Text><Switch accessibilityLabel="计算加班工资" value={draft.salaryEnabled} onValueChange={salaryEnabled=>setDraft({...draft,salaryEnabled})} trackColor={{true:'#16765f'}}/></View><Field label="基础时薪（元 / 小时）" number value={rate} onChange={setRate}/><Text style={styles.hint}>只按1.5、2、3倍工时计算加班工资，正常工时不再自动折算工资。基础薪资可加入下面的工资条组成。更改时薪后，可在统计页“更多设置”一次更新本月全部记录。</Text></View>
    <View style={styles.card}><View style={styles.switchRow}><Text style={styles.sectionTitle}>默认工资条组成</Text><Switch accessibilityLabel="默认工资条组成" value={draft.payslipEnabled} onValueChange={payslipEnabled=>setDraft({...draft,payslipEnabled})} trackColor={{true:'#16765f'}}/></View><PayslipEditor items={defaultItems} onChange={setDefaultItems} disabled={busy}/><Text style={styles.hint}>默认组成用于所有月份。修改开关、项目、金额或备注并保存，会同步所有月份并替换各月自定义组成；仅修改时薪或工时规则不会替换。统计页“更多设置”可单独修改本月。</Text></View>
+   <DelayCategorySettings drafts={delayCategoryDrafts} delays={data.delays} disabled={busy} onChange={setDelayCategoryDrafts}/>
    <Text style={styles.footerHint}>设置修改后需要保存。工时规则不改历史工时；时薪可在统计页批量更新。默认工资条的修改会同步所有月份。</Text><Button text={busy?'正在保存…':'保存设置'} onPress={saveSettings} disabled={busy}/>
    <Button text="更多设置" secondary onPress={openMoreSettings}/>
   </>}
@@ -330,7 +335,7 @@ export default function App() {
     </View>
    </View>
   </Modal>
-  <DelayEditor draft={delayDraft} delays={data.delays} busy={busy} onClose={()=>setDelayDraft(null)} onSave={saveDelayEntry} onDelete={deleteDelayEntry}/><MonthlyComparison visible={comparisonOpen} month={month} data={data} onClose={()=>setComparisonOpen(false)}/><MonthPayrollSettings visible={payrollOpen} month={month} slip={monthlyPayslip(data,month) as Payslip} settings={data.settings} busy={busy} onClose={()=>setPayrollOpen(false)} onSave={saveMonthSlip} onApplyWage={applyMonthWage}/><HoursDetails month={month} index={detailIndex} summary={settlement} onClose={()=>setDetailIndex(null)} onEdit={record=>{setDetailIndex(null);loadEditor(record.date);setTab('record');}}/><View style={styles.nav}>{[['record','记录','＋'],['stats','统计','▤'],['settings','设置','⚙']].map(([key,title,icon])=><Pressable accessibilityRole="tab" accessibilityState={{selected:tab===key}} aria-selected={tab===key} key={key} onPress={()=>{if(key==='settings')changeSettingsDraft(data.settings);setTab(key);}} style={styles.navItem}><Text style={[styles.navIcon,tab===key&&styles.navActive]}>{icon}</Text><Text style={[styles.navText,tab===key&&styles.navActive]}>{title}</Text></Pressable>)}</View>
+  <DelayEditor draft={delayDraft} delays={data.delays} categories={data.settings.delayCategories} busy={busy} onClose={()=>setDelayDraft(null)} onSave={saveDelayEntry} onDelete={deleteDelayEntry}/><MonthlyComparison visible={comparisonOpen} month={month} data={data} onClose={()=>setComparisonOpen(false)}/><MonthPayrollSettings visible={payrollOpen} month={month} slip={monthlyPayslip(data,month) as Payslip} settings={data.settings} busy={busy} onClose={()=>setPayrollOpen(false)} onSave={saveMonthSlip} onApplyWage={applyMonthWage}/><HoursDetails month={month} index={detailIndex} summary={settlement} onClose={()=>setDetailIndex(null)} onEdit={record=>{setDetailIndex(null);loadEditor(record.date);setTab('record');}}/><View style={styles.nav}>{[['record','记录','＋'],['stats','统计','▤'],['settings','设置','⚙']].map(([key,title,icon])=><Pressable accessibilityRole="tab" accessibilityState={{selected:tab===key}} aria-selected={tab===key} key={key} onPress={()=>{if(key==='settings')changeSettingsDraft(data.settings);setTab(key);}} style={styles.navItem}><Text style={[styles.navIcon,tab===key&&styles.navActive]}>{icon}</Text><Text style={[styles.navText,tab===key&&styles.navActive]}>{title}</Text></Pressable>)}</View>
  </View></SafeAreaView></SafeAreaProvider>;
 }
 const styles=StyleSheet.create({

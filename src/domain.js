@@ -1,4 +1,4 @@
-export const DEFAULT_SETTINGS = { workdays: [1,2,3,4,5], doubleWorkdays: [], threshold: 8, salaryEnabled: false, overtimeOnly: false, payslipEnabled: false, payslipItems: [], hourlyRate: 0, reminderEnabled: false, reminderTime: '18:00', reminderDays: [1,2,3,4,5] };
+export const DEFAULT_SETTINGS = { workdays: [1,2,3,4,5], doubleWorkdays: [], threshold: 8, salaryEnabled: false, overtimeOnly: false, payslipEnabled: false, payslipItems: [], hourlyRate: 0, reminderEnabled: false, reminderTime: '18:00', reminderDays: [1,2,3,4,5], delayCategories: ['电气接线','机械安装','缺料/缺件','技术程序','其它'] };
 export function localDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
@@ -87,6 +87,7 @@ export function validateSettings(s) {
   if (s.overtimeOnly!==undefined && typeof s.overtimeOnly!=='boolean') throw new Error('工资计算范围无效');
   if(s.payslipEnabled!==undefined && typeof s.payslipEnabled!=='boolean') throw new Error('工资条开关无效');
   if(s.payslipItems!==undefined)validatePayslipItems(s.payslipItems);
+  if(s.delayCategories!==undefined)validateDelayCategories(s.delayCategories);
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(s.reminderTime)) throw new Error('提醒时间请填写 HH:mm，例如18:00');
   if (s.reminderEnabled && !s.reminderDays.length) throw new Error('至少选择一个提醒星期');
   if (s.shift !== undefined) {
@@ -101,16 +102,27 @@ export function validateSettings(s) {
   return s;
 }
 // Abnormal (delay) hours: a separate debugging log that never feeds into work hours or pay.
-export const DELAY_CATEGORIES = [
-  {key:'electrical', label:'电气接线'},
-  {key:'mechanical', label:'机械安装'},
-  {key:'material', label:'缺料/缺件'},
-  {key:'program', label:'技术程序'},
-  {key:'other', label:'其它'},
-];
-const categoryLabels = new Map(DELAY_CATEGORIES.map(c=>[c.key,c.label]));
-export const delayCategoryLabel = key => categoryLabels.get(key) ?? key;
-const DELAY_LIMITS = {order:50, device:50, party:20, parties:5, note:500, entries:20000};
+// Records store the category name itself, so renaming or deleting a category in
+// settings never leaves an entry pointing at nothing.
+// Early test builds stored fixed keys; they are read back as their names.
+const LEGACY_DELAY_CATEGORIES = {electrical:'电气接线', mechanical:'机械安装', material:'缺料/缺件', program:'技术程序', other:'其它'};
+const DELAY_LIMITS = {order:50, device:50, party:20, parties:5, note:500, entries:20000, category:20, categories:30};
+export function normalizeDelayCategory(value) {
+  return String(value ?? '').trim().replace(/\s+/g,' ');
+}
+function validCategory(value) {
+  return typeof value==='string' && !!value && value===normalizeDelayCategory(value) && value.length<=DELAY_LIMITS.category;
+}
+export function validateDelayCategories(list) {
+  if (!Array.isArray(list) || !list.length || list.length>DELAY_LIMITS.categories) throw new Error(`原因分类需要 1 至 ${DELAY_LIMITS.categories} 个`);
+  const seen = new Set();
+  for (const name of list) {
+    if (!validCategory(name)) throw new Error(`原因分类名称需为 1 至 ${DELAY_LIMITS.category} 字`);
+    if (seen.has(name)) throw new Error(`原因分类「${name}」重复`);
+    seen.add(name);
+  }
+  return [...list];
+}
 
 export function normalizeParty(value) {
   return String(value ?? '').trim().replace(/\s+/g,' ');
@@ -124,7 +136,8 @@ export function validateDelay(entry) {
   }
   if (typeof entry.hours!=='number') throw new Error('耽误时长必须是数字');
   if (units(entry.hours)===0) throw new Error('耽误时长需大于 0 小时');
-  if (!categoryLabels.has(entry.category)) throw new Error('请选择原因分类');
+  const category = Object.hasOwn(LEGACY_DELAY_CATEGORIES,entry.category) ? LEGACY_DELAY_CATEGORIES[entry.category] : entry.category;
+  if (!validCategory(category)) throw new Error('请选择原因分类');
   if (!Array.isArray(entry.parties) || entry.parties.length>DELAY_LIMITS.parties) throw new Error(`责任方最多 ${DELAY_LIMITS.parties} 个`);
   const seen = new Set();
   for (const party of entry.parties) {
@@ -132,7 +145,7 @@ export function validateDelay(entry) {
     if (seen.has(party)) throw new Error('责任方不能重复');
     seen.add(party);
   }
-  return {id:entry.id,date:entry.date,orderNo:entry.orderNo.trim(),device:entry.device.trim(),hours:entry.hours,category:entry.category,parties:[...entry.parties],note:entry.note.trim()};
+  return {id:entry.id,date:entry.date,orderNo:entry.orderNo.trim(),device:entry.device.trim(),hours:entry.hours,category,parties:[...entry.parties],note:entry.note.trim()};
 }
 export function validateDelays(list) {
   if (!Array.isArray(list) || list.length>DELAY_LIMITS.entries) throw new Error('异常工时记录格式无效');
